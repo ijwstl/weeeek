@@ -1,0 +1,2 @@
+"""Weeeek backend application package."""
+

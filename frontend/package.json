@@ -1,0 +1,27 @@
+{
+  "name": "weeeek-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc -b"
+  },
+  "dependencies": {
+    "@tanstack/vue-query": "^5.59.16",
+    "lucide-vue-next": "^0.468.0",
+    "naive-ui": "^2.40.1",
+    "pinia": "^2.2.4",
+    "vue": "^3.5.12",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@vue/tsconfig": "^0.5.1",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.8",
+    "vue-tsc": "^2.1.6"
+  }
+}

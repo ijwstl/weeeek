@@ -1,0 +1,100 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="wGradient" x1="220" y1="360" x2="805" y2="650" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2F63FF"/>
+      <stop offset="0.42" stop-color="#4EA1FF"/>
+      <stop offset="0.72" stop-color="#52C7F2"/>
+      <stop offset="1" stop-color="#82EEFF"/>
+    </linearGradient>
+
+    <linearGradient id="centerGradient" x1="360" y1="675" x2="565" y2="355" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4A9BFF"/>
+      <stop offset="1" stop-color="#79CFFF"/>
+    </linearGradient>
+
+    <linearGradient id="rightShade" x1="565" y1="385" x2="675" y2="670" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6EDBFF"/>
+      <stop offset="1" stop-color="#3E8BFF"/>
+    </linearGradient>
+
+    <linearGradient id="green" x1="717" y1="205" x2="748" y2="292" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86F5D1"/>
+      <stop offset="1" stop-color="#23D7A1"/>
+    </linearGradient>
+    <linearGradient id="yellow" x1="825" y1="220" x2="790" y2="304" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE882"/>
+      <stop offset="1" stop-color="#FFC343"/>
+    </linearGradient>
+    <linearGradient id="red" x1="812" y1="350" x2="884" y2="334" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF708B"/>
+      <stop offset="1" stop-color="#FF5A7A"/>
+    </linearGradient>
+
+    <filter id="shadow" x="245" y="666" width="535" height="95" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="15"/>
+    </filter>
+    <filter id="logoShadow" x="190" y="315" width="650" height="420" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#2374FF" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <!-- transparent background -->
+
+  <g filter="url(#shadow)" opacity="0.65">
+    <ellipse cx="512" cy="706" rx="205" ry="24" fill="#75CCFF"/>
+    <ellipse cx="512" cy="710" rx="150" ry="12" fill="#FFFFFF" opacity="0.7"/>
+  </g>
+
+  <!-- W logo: three clean rounded ribbons, no broken overlap -->
+  <g filter="url(#logoShadow)">
+    <!-- full W silhouette -->
+    <path
+      d="M286 406
+         L406 615
+         L511 406
+         L618 615
+         L739 406"
+      stroke="url(#wGradient)"
+      stroke-width="125"
+      stroke-linecap="round"
+      stroke-linejoin="round"/>
+
+    <!-- center front ribbon -->
+    <path
+      d="M406 615
+         L511 406
+         L618 615"
+      stroke="url(#centerGradient)"
+      stroke-width="125"
+      stroke-linecap="round"
+      stroke-linejoin="round"/>
+
+    <!-- right inner shade to keep folded feel -->
+    <path
+      d="M511 406
+         L618 615"
+      stroke="url(#rightShade)"
+      stroke-width="125"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.72"/>
+
+    <!-- soft highlight -->
+    <path
+      d="M385 640
+         L511 397
+         L632 632"
+      stroke="#B9ECFF"
+      stroke-width="18"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.16"/>
+  </g>
+
+  <!-- top decorative marks -->
+  <g>
+    <rect x="710" y="207" width="37" height="86" rx="18.5" transform="rotate(-12 710 207)" fill="url(#green)"/>
+    <rect x="804" y="215" width="37" height="88" rx="18.5" transform="rotate(25 804 215)" fill="url(#yellow)"/>
+    <rect x="811" y="334" width="75" height="34" rx="17" transform="rotate(-10 811 334)" fill="url(#red)"/>
+  </g>
+</svg>
