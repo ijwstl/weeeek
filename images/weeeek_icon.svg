@@ -1,0 +1,46 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="cardShadow" x="86" y="105" width="852" height="852" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="26" stdDeviation="34" flood-color="#C7D4EA" flood-opacity="0.32"/>
+    </filter>
+    <filter id="softShadow" x="170" y="260" width="700" height="440" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="22" flood-color="#2C65F5" flood-opacity="0.18"/>
+    </filter>
+    <linearGradient id="wLeft" x1="207" y1="337" x2="430" y2="645" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2F6BFF"/>
+      <stop offset="1" stop-color="#1350F2"/>
+    </linearGradient>
+    <linearGradient id="wMid" x1="352" y1="626" x2="571" y2="326" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4386FF"/>
+      <stop offset="1" stop-color="#69BFFF"/>
+    </linearGradient>
+    <linearGradient id="wRight" x1="552" y1="631" x2="795" y2="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4AA8FF"/>
+      <stop offset="1" stop-color="#7DE3F0"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="369" y1="402" x2="650" y2="611" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="#F8FBFF"/>
+  <g filter="url(#cardShadow)">
+    <rect x="122" y="122" width="780" height="780" rx="158" fill="white"/>
+  </g>
+
+  <g filter="url(#softShadow)" transform="translate(0 70)">
+    <!-- Rounded ribbon-style W, rebuilt as vector strokes -->
+    <path d="M293 405 L397 600" stroke="url(#wLeft)" stroke-width="116" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M397 600 L507 405" stroke="url(#wMid)" stroke-width="116" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M507 405 L617 596" stroke="#4AA8FF" stroke-opacity="0.92" stroke-width="116" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M617 596 L732 370" stroke="url(#wRight)" stroke-width="116" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M405 589 L508 407 L616 594" stroke="url(#shine)" stroke-width="112" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <g transform="translate(0 70)">
+    <rect x="672" y="238" width="42" height="72" rx="21" transform="rotate(-8 672 238)" fill="#3AD8A3"/>
+    <rect x="785" y="258" width="43" height="76" rx="21.5" transform="rotate(31 785 258)" fill="#FFD365"/>
+    <rect x="824" y="358" width="42" height="73" rx="21" transform="rotate(78 824 358)" fill="#FF6B82"/>
+  </g>
+</svg>

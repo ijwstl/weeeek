@@ -44,6 +44,7 @@ def default_report_content() -> dict[str, object]:
 
     return {
         "template_version_id": "template-weekly-default-v1",
+        "render_mode": "structured_form",
         "groups": [
             {
                 "group_id": "work_summary",
@@ -126,6 +127,24 @@ def latest_published_version(template_id: str) -> dict[str, object] | None:
 def template_schema_to_content_snapshot(version: dict[str, object]) -> dict[str, object]:
     schema = version["schema_snapshot"]
     schema_data = schema.model_dump() if hasattr(schema, "model_dump") else schema
+    render_mode = schema_data.get("render_mode", "structured_form")
+    if render_mode == "markdown_doc":
+        markdown_template = str(schema_data.get("markdown_template") or "")
+        html_template = str(schema_data.get("html_template") or "")
+        return {
+            "template_version_id": version["id"],
+            "render_mode": "markdown_doc",
+            "content_format": "tiptap_json",
+            "markdown_template_snapshot": markdown_template,
+            "html_template_snapshot": html_template,
+            "markdown_value": markdown_template,
+            "html_value": html_template,
+            "editor_json": schema_data.get("editor_schema", {}),
+            "editor_schema_snapshot": schema_data.get("editor_schema", {}),
+            "ai_blocks_snapshot": schema_data.get("ai_blocks", []),
+            "groups": [],
+        }
+
     groups = []
     for group in schema_data["groups"]:
         fields = []
@@ -137,6 +156,7 @@ def template_schema_to_content_snapshot(version: dict[str, object]) -> dict[str,
                     "field_id": field["field_id"],
                     "field_label_snapshot": field["label"],
                     "field_type_snapshot": field_type,
+                    "config_snapshot": field.get("config", {}),
                     "columns_snapshot": columns,
                     "value": [] if field_type == "table" else "",
                 }
@@ -148,7 +168,11 @@ def template_schema_to_content_snapshot(version: dict[str, object]) -> dict[str,
                 "fields": fields,
             }
         )
-    return {"template_version_id": version["id"], "groups": groups}
+    return {
+        "template_version_id": version["id"],
+        "render_mode": "structured_form",
+        "groups": groups,
+    }
 
 
 DEMO_REPORT_INSTANCE = {

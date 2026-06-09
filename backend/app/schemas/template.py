@@ -19,6 +19,7 @@ FIELD_TYPES = {
 }
 
 TABLE_COLUMN_TYPES = FIELD_TYPES - {"table", "rich_text"}
+TEMPLATE_RENDER_MODES = {"structured_form", "markdown_doc"}
 
 
 class TemplateTableColumn(BaseModel):
@@ -76,10 +77,27 @@ class TemplateGroup(BaseModel):
 
 
 class TemplateSchema(BaseModel):
-    groups: list[TemplateGroup]
+    render_mode: str = "structured_form"
+    groups: list[TemplateGroup] = Field(default_factory=list)
+    markdown_template: str = ""
+    html_template: str = ""
+    editor_schema: dict[str, object] = Field(default_factory=dict)
+    ai_blocks: list[dict[str, object]] = Field(default_factory=list)
+
+    @field_validator("render_mode")
+    @classmethod
+    def validate_render_mode(cls, value: str) -> str:
+        if value not in TEMPLATE_RENDER_MODES:
+            raise ValueError(f"Unsupported template render_mode: {value}")
+        return value
 
     @model_validator(mode="after")
     def validate_unique_ids(self) -> "TemplateSchema":
+        if self.render_mode == "markdown_doc":
+            if not self.markdown_template.strip() and not self.html_template.strip():
+                raise ValueError("Markdown template requires rich text content")
+            return self
+
         group_ids = [group.group_id for group in self.groups]
         if len(group_ids) != len(set(group_ids)):
             raise ValueError("Duplicate group_id in template schema")
@@ -130,4 +148,3 @@ class TemplateDraftUpdate(BaseModel):
 class TemplateSchemaValidationResult(BaseModel):
     valid: bool
     errors: list[str] = Field(default_factory=list)
-

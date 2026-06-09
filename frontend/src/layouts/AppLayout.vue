@@ -10,7 +10,7 @@
       </div>
 
       <nav class="nav-list">
-        <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" class="nav-item">
+        <RouterLink v-for="item in visibleNavItems" :key="item.to" :to="item.to" class="nav-item">
           <n-icon size="18">
             <component :is="item.icon" />
           </n-icon>
@@ -95,9 +95,11 @@ import {
   markAllInAppNotificationsRead,
   markInAppNotificationRead
 } from '@/api/notifications'
+import { Permission, usePermissions, type PermissionCode } from '@/composables/usePermissions'
 
 const queryClient = useQueryClient()
 const notificationOpen = ref(false)
+const { hasAnyPermission } = usePermissions()
 
 const { data: notifications } = useQuery({
   queryKey: ['in-app-notifications'],
@@ -125,15 +127,49 @@ const readAllMutation = useMutation({
   }
 })
 
-const navItems = [
+const navItems: Array<{
+  label: string
+  to: string
+  icon: unknown
+  permissions?: PermissionCode[]
+}> = [
   { label: '工作台', to: '/', icon: LayoutDashboard },
-  { label: '部门', to: '/departments', icon: FolderTree },
-  { label: '项目团队', to: '/projects', icon: Users },
-  { label: '报告中心', to: '/reports', icon: FileText },
-  { label: '模板', to: '/templates', icon: PanelsTopLeft },
-  { label: '数据源', to: '/data-sources', icon: Database },
-  { label: '设置', to: '/settings', icon: Settings }
+  { label: '部门', to: '/departments', icon: FolderTree, permissions: [Permission.DepartmentRead] },
+  { label: '项目团队', to: '/projects', icon: Users, permissions: [Permission.ProjectRead] },
+  {
+    label: '报告中心',
+    to: '/reports',
+    icon: FileText,
+    permissions: [Permission.ReportReadOwn, Permission.ReportReadSpace]
+  },
+  {
+    label: '模板',
+    to: '/templates',
+    icon: PanelsTopLeft,
+    permissions: [Permission.TemplateCreate, Permission.TemplateUpdate, Permission.TemplatePublish]
+  },
+  {
+    label: '数据源',
+    to: '/data-sources',
+    icon: Database,
+    permissions: [Permission.DatasourceManageOwn, Permission.DatasourceProviderManage]
+  },
+  {
+    label: '设置',
+    to: '/settings',
+    icon: Settings,
+    permissions: [
+      Permission.WorkspaceSettingManage,
+      Permission.WorkspaceRoleManage,
+      Permission.WorkspaceAuditView,
+      Permission.NotificationChannelManage
+    ]
+  }
 ]
+
+const visibleNavItems = computed(() =>
+  navItems.filter((item) => !item.permissions || hasAnyPermission(item.permissions))
+)
 
 function handleReadNotice(id: string) {
   readNoticeMutation.mutate(id)

@@ -6,13 +6,13 @@
         <p>连接个人数据源，控制 AI 生成周报时可以使用的上下文。</p>
       </div>
       <div class="heading-actions">
-        <n-button secondary @click="showAction('同步任务已加入队列')">
+        <n-button secondary :loading="syncAllMutation.isPending.value" @click="syncAllMutation.mutate()">
           <template #icon>
             <n-icon><RefreshCw /></n-icon>
           </template>
           同步全部
         </n-button>
-        <n-button type="primary" @click="showAction('连接数据源弹窗待接入')">
+        <n-button type="primary" @click="openCreateDrawer('gitlab')">
           <template #icon>
             <n-icon><PlugZap /></n-icon>
           </template>
@@ -101,7 +101,7 @@
                 </template>
                 测试连接
               </n-button>
-              <n-button size="small" secondary @click="showAction(`${source.name} 授权范围待编辑`)">
+              <n-button size="small" secondary @click="openEditDrawer(source)">
                 编辑范围
               </n-button>
               <n-button
@@ -124,7 +124,7 @@
               :key="item.name"
               class="connect-tile"
               type="button"
-              @click="showAction(`${item.name} 连接流程待接入`)"
+              @click="openCreateDrawer(item.type)"
             >
               <n-icon size="22"><component :is="item.icon" /></n-icon>
               <span>{{ item.name }}</span>
@@ -235,6 +235,85 @@
         </tbody>
       </table>
     </section>
+
+    <div v-if="sourceDrawerOpen" class="preview-overlay">
+      <section class="source-config-drawer">
+        <div class="preview-head">
+          <div>
+            <h2>{{ editingSourceId ? '编辑数据源' : '连接数据源' }}</h2>
+            <span>配置 AI 可以读取的个人授权范围。</span>
+          </div>
+          <n-button text @click="closeSourceDrawer">
+            <template #icon>
+              <n-icon><X /></n-icon>
+            </template>
+          </n-button>
+        </div>
+
+        <div class="source-config-body">
+          <section class="source-type-grid">
+            <button
+              v-for="type in sourceTypes"
+              :key="type.value"
+              class="source-type-tile"
+              :class="{ active: sourceForm.source_type === type.value }"
+              type="button"
+              :disabled="Boolean(editingSourceId)"
+              @click="selectSourceType(type.value)"
+            >
+              <n-icon size="24" :class="sourceClass(type.value)">
+                <component :is="type.icon" />
+              </n-icon>
+              <span>{{ type.label }}</span>
+              <small>{{ type.description }}</small>
+            </button>
+          </section>
+
+          <div class="source-form-grid">
+            <label>
+              <span>连接名称</span>
+              <input v-model="sourceForm.name" class="rule-input" placeholder="例如 GitLab" />
+            </label>
+            <label>
+              <span>账号标识</span>
+              <input v-model="sourceForm.account_name" class="rule-input" placeholder="例如 wangqi@gitlab.local" />
+            </label>
+            <label>
+              <span>{{ sourceScopeLabel }}</span>
+              <textarea
+                v-model="sourceForm.scopeText"
+                class="rule-textarea"
+                :placeholder="sourceScopePlaceholder"
+              />
+            </label>
+            <label>
+              <span>读取权限</span>
+              <textarea
+                v-model="sourceForm.permissionsText"
+                class="rule-textarea"
+                placeholder="commits:read, merge_requests:read, issues:read"
+              />
+            </label>
+          </div>
+
+          <section class="source-config-note">
+            <CheckCircle2 :size="16" />
+            <span>这里只保存授权范围配置。真实 OAuth、Token 加密与后台同步任务会接在后续集成层。</span>
+          </section>
+        </div>
+
+        <div class="preview-actions">
+          <n-button secondary @click="closeSourceDrawer">取消</n-button>
+          <n-button
+            type="primary"
+            :loading="saveSourceMutation.isPending.value"
+            @click="handleSaveSource"
+          >
+            保存配置
+          </n-button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -251,28 +330,37 @@ import {
   GitBranch,
   Gitlab,
   PlugZap,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-vue-next'
 
 import {
+  createDataSource,
   listDataSources,
   testDataSource,
   updateDataSource,
-  type DataSourceConnection
+  type DataSourceConnection,
+  type DataSourceConnectionCreate,
+  type DataSourceType
 } from '@/api/dataSources'
 
 const message = useMessage()
 const queryClient = useQueryClient()
 const activeSourceTab = ref<'sources' | 'ai' | 'records'>('sources')
+const sourceDrawerOpen = ref(false)
+const editingSourceId = ref<string | null>(null)
 const aiPreferences = reactive({
   confirmSources: true,
   fillEmptyOnly: true,
   includeTechnicalDetails: true
 })
-
-function showAction(text: string) {
-  message.info(text)
-}
+const sourceForm = reactive({
+  source_type: 'gitlab' as DataSourceType,
+  name: 'GitLab',
+  account_name: '',
+  scopeText: '',
+  permissionsText: 'commits:read, merge_requests:read'
+})
 
 const { data: connectedSources } = useQuery({
   queryKey: ['data-sources'],
@@ -286,6 +374,23 @@ const testMutation = useMutation({
   }
 })
 
+const syncAllMutation = useMutation({
+  mutationFn: async () => {
+    const enabledIds = (connectedSources.value ?? [])
+      .filter((source) => source.enabled)
+      .map((source) => source.id)
+    await Promise.all(enabledIds.map((id) => testDataSource(id)))
+    return enabledIds.length
+  },
+  onSuccess: (count) => {
+    queryClient.invalidateQueries({ queryKey: ['data-sources'] })
+    message.success(count ? `已同步 ${count} 个数据源` : '暂无可同步的数据源')
+  },
+  onError: () => {
+    message.error('同步失败，请检查数据源配置')
+  }
+})
+
 const updateMutation = useMutation({
   mutationFn: (source: DataSourceConnection) =>
     updateDataSource(source.id, { enabled: !source.enabled }),
@@ -295,8 +400,40 @@ const updateMutation = useMutation({
   }
 })
 
+const saveSourceMutation = useMutation({
+  mutationFn: () => {
+    const payload = buildSourcePayload()
+    if (editingSourceId.value) {
+      return updateDataSource(editingSourceId.value, payload)
+    }
+    return createDataSource(payload)
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['data-sources'] })
+    closeSourceDrawer()
+    message.success('数据源配置已保存')
+  },
+  onError: () => {
+    message.error('数据源配置保存失败')
+  }
+})
+
 const enabledSources = computed(() => (connectedSources.value ?? []).filter((source) => source.enabled))
 const sourceCards = computed(() => (connectedSources.value ?? []).map(toSourceCard))
+const sourceScopeLabel = computed(() =>
+  sourceForm.source_type === 'jira'
+    ? 'Jira 项目范围'
+    : sourceForm.source_type === 'custom'
+      ? 'Webhook 标识'
+      : '仓库范围'
+)
+const sourceScopePlaceholder = computed(() =>
+  sourceForm.source_type === 'jira'
+    ? 'WEEK, INFRA'
+    : sourceForm.source_type === 'custom'
+      ? 'release-webhook, incident-webhook'
+      : 'weeeek/backend, AIProject/weeeek'
+)
 
 function toSourceCard(source: DataSourceConnection) {
   const permissions = Array.isArray(source.scope_config.permissions)
@@ -350,10 +487,116 @@ function toggleSource(source: DataSourceConnection) {
   updateMutation.mutate(source)
 }
 
+function selectSourceType(type: DataSourceType) {
+  sourceForm.source_type = type
+  sourceForm.name = defaultSourceName(type)
+  sourceForm.permissionsText = defaultPermissions(type)
+}
+
+function openCreateDrawer(type: DataSourceType) {
+  editingSourceId.value = null
+  sourceDrawerOpen.value = true
+  sourceForm.source_type = type
+  sourceForm.name = defaultSourceName(type)
+  sourceForm.account_name = ''
+  sourceForm.scopeText = ''
+  sourceForm.permissionsText = defaultPermissions(type)
+}
+
+function openEditDrawer(source: DataSourceConnection) {
+  editingSourceId.value = source.id
+  sourceDrawerOpen.value = true
+  sourceForm.source_type = source.source_type
+  sourceForm.name = source.name
+  sourceForm.account_name = source.account_name
+  sourceForm.scopeText = scopeTextFromConfig(source)
+  const permissions = Array.isArray(source.scope_config.permissions)
+    ? source.scope_config.permissions.map(String)
+    : []
+  sourceForm.permissionsText = permissions.join(', ')
+}
+
+function closeSourceDrawer() {
+  sourceDrawerOpen.value = false
+  editingSourceId.value = null
+}
+
+function handleSaveSource() {
+  if (!sourceForm.name.trim() || !sourceForm.account_name.trim()) {
+    message.warning('请填写连接名称和账号标识')
+    return
+  }
+  saveSourceMutation.mutate()
+}
+
+function buildSourcePayload(): DataSourceConnectionCreate {
+  return {
+    source_type: sourceForm.source_type,
+    name: sourceForm.name.trim(),
+    account_name: sourceForm.account_name.trim(),
+    scope_config: buildScopeConfig()
+  }
+}
+
+function buildScopeConfig() {
+  const scopeItems = splitInput(sourceForm.scopeText)
+  const config: Record<string, unknown> = {
+    permissions: splitInput(sourceForm.permissionsText)
+  }
+  if (sourceForm.source_type === 'jira') {
+    config.projects = scopeItems
+  } else if (sourceForm.source_type === 'custom') {
+    config.events = scopeItems
+  } else {
+    config.repositories = scopeItems
+  }
+  return config
+}
+
+function scopeTextFromConfig(source: DataSourceConnection) {
+  const keys = source.source_type === 'jira'
+    ? ['projects']
+    : source.source_type === 'custom'
+      ? ['events']
+      : ['repositories']
+  const items = keys.flatMap((key) =>
+    Array.isArray(source.scope_config[key]) ? source.scope_config[key].map(String) : []
+  )
+  return items.join(', ')
+}
+
+function splitInput(value: string) {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function defaultSourceName(type: DataSourceType) {
+  if (type === 'gitlab') return 'GitLab'
+  if (type === 'github') return 'GitHub'
+  if (type === 'jira') return 'Jira'
+  return '自定义 Webhook'
+}
+
+function defaultPermissions(type: DataSourceType) {
+  if (type === 'jira') return 'issues:read, comments:read, projects:read'
+  if (type === 'github') return 'repo:read, pull_requests:read, issues:read'
+  if (type === 'custom') return 'events:read'
+  return 'commits:read, merge_requests:read, pipelines:read'
+}
+
+const sourceTypes = [
+  { value: 'gitlab' as const, label: 'GitLab', description: '提交、MR、流水线', icon: Gitlab },
+  { value: 'github' as const, label: 'GitHub', description: '提交、PR、Issue', icon: Github },
+  { value: 'jira' as const, label: 'Jira', description: '任务、状态、评论', icon: FileText },
+  { value: 'custom' as const, label: 'Webhook', description: '外部系统事件', icon: PlugZap }
+]
+
 const connectableSources = [
-  { name: '内部数据库', description: '读取业务指标快照', icon: Database },
-  { name: 'Confluence', description: '读取项目文档更新', icon: FileText },
-  { name: '自定义 Webhook', description: '接收外部系统事件', icon: PlugZap }
+  { name: 'GitLab', description: '提交、MR、流水线', icon: Gitlab, type: 'gitlab' as const },
+  { name: 'Jira', description: '任务、状态、评论', icon: FileText, type: 'jira' as const },
+  { name: '自定义 Webhook', description: '接收外部系统事件', icon: PlugZap, type: 'custom' as const }
 ]
 
 const records = [

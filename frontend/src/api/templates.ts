@@ -32,7 +32,12 @@ export interface TemplateGroup {
 }
 
 export interface TemplateSchema {
+  render_mode?: 'structured_form' | 'markdown_doc'
   groups: TemplateGroup[]
+  markdown_template?: string
+  html_template?: string
+  editor_schema?: Record<string, unknown>
+  ai_blocks?: Array<Record<string, unknown>>
 }
 
 export interface ReportTemplate {

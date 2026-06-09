@@ -23,8 +23,19 @@ export interface DataSourceConnectionUpdate {
   scope_config?: Record<string, unknown>
 }
 
+export interface DataSourceConnectionCreate {
+  source_type: DataSourceType
+  name: string
+  account_name: string
+  scope_config: Record<string, unknown>
+}
+
 export function listDataSources() {
   return apiGet<DataSourceConnection[]>('/data-sources')
+}
+
+export function createDataSource(payload: DataSourceConnectionCreate) {
+  return apiPost<DataSourceConnection, DataSourceConnectionCreate>('/data-sources', payload)
 }
 
 export function updateDataSource(id: string, payload: DataSourceConnectionUpdate) {

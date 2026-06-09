@@ -69,3 +69,41 @@ def test_update_template_draft_persists_select_options() -> None:
     updated_schema = detail_response.json()["data"]["schema_snapshot"]
     options = updated_schema["groups"][0]["fields"][0]["config"]["columns"][1]["config"]["options"]
     assert "会议纪要" in options
+
+
+def test_update_template_draft_supports_markdown_mode() -> None:
+    original_response = client.get("/api/v1/templates/template-weekly-default/draft")
+    assert original_response.status_code == 200
+    original_schema = original_response.json()["data"]["schema_snapshot"]
+    schema = {
+        "render_mode": "markdown_doc",
+        "groups": [],
+        "markdown_template": "# 本周工作报告\n\n{{ai:block:weekly_done}}",
+        "editor_schema": {"format": "markdown"},
+        "ai_blocks": [{"id": "weekly_done", "label": "本周完成"}],
+    }
+
+    update_response = client.put(
+        "/api/v1/templates/template-weekly-default/draft",
+        json={"schema_snapshot": schema},
+    )
+    assert update_response.status_code == 200
+    updated_schema = update_response.json()["data"]["schema_snapshot"]
+    assert updated_schema["render_mode"] == "markdown_doc"
+    assert "weekly_done" in updated_schema["markdown_template"]
+
+    restore_response = client.put(
+        "/api/v1/templates/template-weekly-default/draft",
+        json={"schema_snapshot": original_schema},
+    )
+    assert restore_response.status_code == 200
+
+
+def test_validate_markdown_template_requires_content() -> None:
+    response = client.post(
+        "/api/v1/templates/validate-schema",
+        json={"render_mode": "markdown_doc", "groups": [], "markdown_template": ""},
+    )
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["valid"] is False

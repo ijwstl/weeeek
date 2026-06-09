@@ -27,6 +27,14 @@ export interface ReportDraft {
 
 export interface ReportContentSnapshot {
   template_version_id?: string
+  render_mode?: 'structured_form' | 'markdown_doc'
+  content_format?: string
+  markdown_template_snapshot?: string
+  markdown_value?: string
+  html_value?: string
+  editor_json?: Record<string, unknown> | null
+  editor_schema_snapshot?: Record<string, unknown>
+  ai_blocks_snapshot?: Array<Record<string, unknown>>
   groups: ReportGroupSnapshot[]
 }
 
@@ -40,6 +48,7 @@ export interface ReportFieldSnapshot {
   field_id: string
   field_label_snapshot: string
   field_type_snapshot: string
+  config_snapshot?: Record<string, unknown>
   columns_snapshot?: Array<{
     column_id: string
     label: string
@@ -72,6 +81,10 @@ export function listMyReportTasks() {
 
 export function listMyReportHistory() {
   return apiGet<ReportSubmission[]>('/reports/my-history')
+}
+
+export function listReportSubmissions(reportInstanceId: string) {
+  return apiGet<ReportSubmission[]>(`/reports/${reportInstanceId}/submissions`)
 }
 
 export function getReportDetail(reportInstanceId: string) {

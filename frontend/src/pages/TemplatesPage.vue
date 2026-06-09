@@ -55,7 +55,49 @@
           </div>
         </div>
 
-        <div class="template-groups">
+        <div class="template-mode-switch">
+          <button
+            class="segment"
+            :class="{ active: editableSchema.render_mode !== 'markdown_doc' }"
+            type="button"
+            @click="setRenderMode('structured_form')"
+          >
+            表单模板
+          </button>
+          <button
+            class="segment"
+            :class="{ active: editableSchema.render_mode === 'markdown_doc' }"
+            type="button"
+            @click="setRenderMode('markdown_doc')"
+          >
+            Markdown 模板
+          </button>
+        </div>
+
+        <div v-if="editableSchema.render_mode === 'markdown_doc'" class="markdown-template-editor">
+          <section class="markdown-editor-panel">
+            <div class="markdown-editor-head">
+              <div>
+                <h3>富文本报告模板</h3>
+                <span>用富文本方式配置文档模板；系统会保留 Markdown 文本兼容快照。</span>
+              </div>
+              <n-tag size="small" type="info">Tiptap</n-tag>
+            </div>
+            <TiptapReportEditor
+              v-model="templateEditorJson"
+              :fallback-markdown="editableSchema.markdown_template"
+              @update-html="handleTemplateHtmlUpdate"
+              @update-text="handleTemplateTextUpdate"
+            />
+          </section>
+          <aside class="markdown-token-panel">
+            <h3>AI 区块标记</h3>
+            <p>可以在模板中预留区块，后续 AI 会按区块写入内容。</p>
+            <code v-for="token in markdownAiTokens" :key="token">{{ token }}</code>
+          </aside>
+        </div>
+
+        <div v-else class="template-groups">
           <section
             v-for="(group, groupIndex) in editableSchema.groups"
             :key="group.group_id"
@@ -247,10 +289,19 @@ import {
   validateTemplateSchema
 } from '@/api/templates'
 import type { TemplateColumn, TemplateField, TemplateGroup, TemplateSchema } from '@/api/templates'
+import TiptapReportEditor from '@/components/TiptapReportEditor.vue'
 
 const message = useMessage()
 const queryClient = useQueryClient()
-const editableSchema = reactive<TemplateSchema>({ groups: [] })
+const editableSchema = reactive<TemplateSchema>({
+  render_mode: 'structured_form',
+  groups: [],
+  markdown_template: '',
+  html_template: '',
+  editor_schema: {},
+  ai_blocks: []
+})
+const templateEditorJson = ref<Record<string, unknown> | null>(null)
 
 const fieldTypes = [
   'text',
@@ -269,6 +320,11 @@ const fieldTypes = [
   'url'
 ]
 const columnTypes = fieldTypes.filter((type) => type !== 'table')
+const markdownAiTokens = [
+  '{{ai:block:weekly_done}}',
+  '{{ai:block:next_plan}}',
+  '{{ai:block:risks}}'
+]
 
 const { data: templates } = useQuery({
   queryKey: ['templates'],
@@ -296,10 +352,19 @@ const { data: draft } = useQuery({
 watch(
   draft,
   (value) => {
+    const cloned = cloneSchema(value?.schema_snapshot ?? { render_mode: 'structured_form', groups: [] })
+    editableSchema.render_mode = cloned.render_mode ?? 'structured_form'
+    editableSchema.markdown_template = cloned.markdown_template ?? defaultMarkdownTemplate()
+    editableSchema.html_template = cloned.html_template ?? ''
+    editableSchema.editor_schema = cloned.editor_schema ?? {}
+    editableSchema.ai_blocks = cloned.ai_blocks ?? []
+    templateEditorJson.value = Object.keys(editableSchema.editor_schema ?? {}).length
+      ? editableSchema.editor_schema ?? null
+      : null
     editableSchema.groups.splice(
       0,
       editableSchema.groups.length,
-      ...cloneSchema(value?.schema_snapshot ?? { groups: [] }).groups
+      ...cloned.groups
     )
   },
   { immediate: true }
@@ -404,6 +469,22 @@ function addGroup() {
   })
 }
 
+function setRenderMode(mode: 'structured_form' | 'markdown_doc') {
+  editableSchema.render_mode = mode
+  if (mode === 'markdown_doc' && !editableSchema.markdown_template?.trim()) {
+    editableSchema.markdown_template = defaultMarkdownTemplate()
+  }
+}
+
+function handleTemplateHtmlUpdate(value: string) {
+  editableSchema.html_template = value
+}
+
+function handleTemplateTextUpdate(value: string) {
+  editableSchema.markdown_template = value
+  editableSchema.editor_schema = templateEditorJson.value ?? {}
+}
+
 function removeGroup(index: number) {
   editableSchema.groups.splice(index, 1)
 }
@@ -482,5 +563,23 @@ function fieldTypeLabel(type: string) {
 
 function cloneSchema(schema: TemplateSchema): TemplateSchema {
   return JSON.parse(JSON.stringify(schema)) as TemplateSchema
+}
+
+function defaultMarkdownTemplate() {
+  return [
+    '# 本周工作报告',
+    '',
+    '## 本周完成',
+    '',
+    '{{ai:block:weekly_done}}',
+    '',
+    '## 下周计划',
+    '',
+    '{{ai:block:next_plan}}',
+    '',
+    '## 风险与阻塞',
+    '',
+    '{{ai:block:risks}}'
+  ].join('\n')
 }
 </script>

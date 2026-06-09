@@ -63,6 +63,9 @@
               </template>
               {{ task.status === 'submitted' ? '查看' : '填写' }}
             </n-button>
+            <n-button size="small" text @click="selectSubmissionReport(task.id)">
+              版本
+            </n-button>
           </article>
 
           <div v-if="!filteredTasks.length" class="empty-state">
@@ -108,6 +111,76 @@
         </section>
       </aside>
     </div>
+
+    <section class="panel report-submission-panel">
+      <div class="panel-header">
+        <div>
+          <h2>版本记录</h2>
+          <p>{{ selectedSubmissionTask ? reportTitle(selectedSubmissionTask) : '选择左侧报告查看提交版本' }}</p>
+        </div>
+        <n-tag size="small" type="info">{{ submissions?.length ?? 0 }} 个版本</n-tag>
+      </div>
+
+      <div v-if="selectedSubmissionTask" class="submission-detail-grid">
+        <aside class="submission-version-list">
+          <button
+            v-for="submission in submissions ?? []"
+            :key="submission.id"
+            class="submission-version-item"
+            :class="{ active: selectedSubmissionId === submission.id }"
+            type="button"
+            @click="selectedSubmissionId = submission.id"
+          >
+            <strong>v{{ submission.version_no }}</strong>
+            <span>{{ formatDateTime(submission.submitted_at) }}</span>
+            <small>{{ submission.change_reason || '无变更说明' }}</small>
+          </button>
+        </aside>
+
+        <div class="submission-preview">
+          <div v-if="selectedSubmission">
+            <div
+              v-for="group in selectedSubmission.content_snapshot.groups"
+              :key="group.group_id"
+              class="submission-preview-group"
+            >
+              <h3>{{ group.group_label_snapshot }}</h3>
+              <article
+                v-for="field in group.fields"
+                :key="field.field_id"
+                class="submission-preview-field"
+              >
+                <strong>{{ field.field_label_snapshot }}</strong>
+                <table
+                  v-if="field.field_type_snapshot === 'table' && Array.isArray(field.value)"
+                  class="report-table compact-report-table"
+                >
+                  <thead>
+                    <tr>
+                      <th v-for="column in field.columns_snapshot ?? []" :key="column.column_id">
+                        {{ column.label }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, index) in field.value" :key="index">
+                      <td v-for="column in field.columns_snapshot ?? []" :key="column.column_id">
+                        {{ tableCell(row, column.column_id) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p v-else>{{ String(field.value ?? '-') }}</p>
+              </article>
+            </div>
+          </div>
+          <div v-else class="empty-state">
+            <n-icon size="28"><Inbox /></n-icon>
+            <span>暂无提交版本</span>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -129,6 +202,7 @@ import {
 import {
   listMyReportHistory,
   listMyReportTasks,
+  listReportSubmissions,
   type ReportInstance
 } from '@/api/reports'
 
@@ -137,6 +211,8 @@ type FilterValue = 'all' | 'todo' | 'submitted'
 const router = useRouter()
 const activeFilter = ref<FilterValue>('all')
 const keyword = ref('')
+const selectedSubmissionReportId = ref<string>()
+const selectedSubmissionId = ref<string>()
 
 const {
   data: tasks,
@@ -149,6 +225,12 @@ const {
 const { data: history } = useQuery({
   queryKey: ['my-report-history'],
   queryFn: listMyReportHistory
+})
+
+const { data: submissions } = useQuery({
+  queryKey: ['report-submissions', selectedSubmissionReportId],
+  queryFn: () => listReportSubmissions(selectedSubmissionReportId.value as string),
+  enabled: computed(() => Boolean(selectedSubmissionReportId.value))
 })
 
 const filterOptions: Array<{ label: string; value: FilterValue }> = [
@@ -177,6 +259,13 @@ const draftCount = computed(() => (tasks.value ?? []).filter((task) => task.stat
 const submittedCount = computed(() =>
   (tasks.value ?? []).filter((task) => task.status === 'submitted').length
 )
+const selectedSubmissionTask = computed(() =>
+  (tasks.value ?? []).find((task) => task.id === selectedSubmissionReportId.value)
+)
+const selectedSubmission = computed(() =>
+  (submissions.value ?? []).find((submission) => submission.id === selectedSubmissionId.value) ??
+  submissions.value?.[0]
+)
 
 function openTask(reportId?: string) {
   if (reportId) {
@@ -186,6 +275,11 @@ function openTask(reportId?: string) {
 
 function refreshTasks() {
   refetchTasks()
+}
+
+function selectSubmissionReport(reportId: string) {
+  selectedSubmissionReportId.value = reportId
+  selectedSubmissionId.value = undefined
 }
 
 function reportTitle(task: ReportInstance) {
@@ -217,5 +311,10 @@ function statusTagType(status: string) {
   if (status === 'submitted') return 'success' as const
   if (status === 'pending') return 'warning' as const
   return 'info' as const
+}
+
+function tableCell(row: unknown, columnId: string) {
+  if (!row || typeof row !== 'object') return '-'
+  return String((row as Record<string, unknown>)[columnId] ?? '-')
 }
 </script>

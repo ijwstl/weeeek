@@ -6,7 +6,7 @@
         <p>管理跨部门项目攻坚团队、目标周期和项目进度填报空间。</p>
       </div>
       <div class="heading-actions">
-        <n-button type="primary" @click="startCreate">
+        <n-button v-if="canCreateProject" type="primary" @click="startCreate">
           <template #icon>
             <n-icon><Plus /></n-icon>
           </template>
@@ -15,28 +15,75 @@
       </div>
     </div>
 
-    <div class="projects-grid">
-      <section class="panel project-list-panel">
-        <div class="panel-header">
-          <h2>项目列表</h2>
-          <n-tag size="small">{{ projectTeams?.length ?? 0 }} 个</n-tag>
+    <section class="project-portfolio-panel">
+      <div class="project-stat-grid">
+        <div>
+          <span>全部项目</span>
+          <strong>{{ projectTeams?.length ?? 0 }}</strong>
         </div>
+        <div>
+          <span>进行中</span>
+          <strong>{{ projectCountByStatus('in_progress') }}</strong>
+        </div>
+        <div>
+          <span>存在风险</span>
+          <strong>{{ projectCountByStatus('at_risk') }}</strong>
+        </div>
+        <div>
+          <span>已归档</span>
+          <strong>{{ projectCountByStatus('archived') }}</strong>
+        </div>
+      </div>
+
+      <div class="project-toolbar">
+        <label class="project-search">
+          <Search :size="16" />
+          <input v-model="keyword" placeholder="搜索项目名称、目标或描述" />
+        </label>
+        <div class="project-filter-row">
+          <button
+            v-for="filter in statusFilters"
+            :key="filter.value"
+            class="toolbar-tab"
+            :class="{ active: statusFilter === filter.value }"
+            type="button"
+            @click="statusFilter = filter.value"
+          >
+            {{ filter.label }}
+          </button>
+        </div>
+      </div>
+
+      <div class="project-card-grid">
         <button
-          v-for="project in projectTeams ?? []"
+          v-for="project in filteredProjects"
           :key="project.id"
-          class="project-list-item"
+          class="project-card"
           :class="{ active: selectedProjectId === project.id }"
           type="button"
           @click="selectProject(project.id)"
         >
-          <strong>{{ project.name }}</strong>
-          <span>{{ project.description || project.goal }}</span>
-          <n-tag size="small" :type="statusTagType(project.status)">
-            {{ statusText(project.status) }}
-          </n-tag>
+          <div class="project-card-head">
+            <strong>{{ project.name }}</strong>
+            <n-tag size="small" :type="statusTagType(project.status)">
+              {{ statusText(project.status) }}
+            </n-tag>
+          </div>
+          <p>{{ project.description || project.goal || '未配置项目描述' }}</p>
+          <div class="project-card-meta">
+            <span>{{ project.start_date ?? '-' }} 至 {{ project.expected_end_date ?? '-' }}</span>
+            <span>{{ reportModeText(project.report_space?.report_mode) }}</span>
+          </div>
         </button>
-      </section>
+      </div>
 
+      <div v-if="!filteredProjects.length" class="empty-state">
+        <strong>没有匹配的项目团队</strong>
+        <span>调整筛选条件或创建新的项目团队。</span>
+      </div>
+    </section>
+
+    <div class="project-workspace-grid">
       <section class="panel project-detail-panel">
         <div class="panel-header">
           <div>
@@ -44,13 +91,14 @@
             <p>{{ selectedProject?.goal ?? '选择一个项目团队查看详情。' }}</p>
           </div>
           <div v-if="selectedProject" class="heading-actions">
-            <n-button secondary size="small" @click="startEdit(selectedProject)">
+            <n-button v-if="canUpdateProject" secondary size="small" @click="startEdit(selectedProject)">
               <template #icon>
                 <n-icon><Pencil /></n-icon>
               </template>
               编辑
             </n-button>
             <n-button
+              v-if="canArchiveProject"
               secondary
               size="small"
               :loading="statusMutation.isPending.value"
@@ -124,7 +172,7 @@
               <input v-model="projectReportForm.ai_enabled" type="checkbox" />
               AI 草稿
             </label>
-            <div class="heading-actions">
+            <div v-if="canManageProjectRules" class="heading-actions">
               <n-button
                 secondary
                 :loading="saveReportSpaceMutation.isPending.value"
@@ -145,7 +193,7 @@
 
         <div v-if="selectedProject" class="project-section">
           <h3>成员角色</h3>
-          <div class="project-member-add-row">
+          <div v-if="canManageProjectMembers" class="project-member-add-row">
             <select v-model="memberForm.member_id" class="rule-input">
               <option value="">选择成员</option>
               <option v-for="member in addableMembers" :key="member.id" :value="member.id">
@@ -173,6 +221,7 @@
               </div>
               <div class="member-role-actions">
                 <select
+                  v-if="canManageProjectMembers"
                   class="role-select"
                   :value="member.role"
                   @change="handleRoleChange(member.member_id, $event)"
@@ -180,7 +229,13 @@
                   <option value="project_admin">项目管理员</option>
                   <option value="project_member">普通成员</option>
                 </select>
-                <n-button text size="small" @click="handleRemoveMember(member.member_id)">
+                <n-tag v-else size="small">{{ projectMemberRoleText(member.role) }}</n-tag>
+                <n-button
+                  v-if="canManageProjectMembers"
+                  text
+                  size="small"
+                  @click="handleRemoveMember(member.member_id)"
+                >
                   移除
                 </n-button>
               </div>
@@ -189,10 +244,44 @@
         </div>
       </section>
 
-      <aside class="panel project-editor-panel">
+      <aside class="panel project-side-panel">
         <div class="panel-header">
-          <h2>{{ editingProjectId ? '编辑项目' : '新建项目' }}</h2>
-          <n-tag size="small" type="info">跨部门</n-tag>
+          <h2>项目视图</h2>
+          <n-tag size="small" type="info">列表优先</n-tag>
+        </div>
+        <div class="definition-list">
+          <div>
+            <span>当前筛选</span>
+            <strong>{{ statusFilterLabel }}</strong>
+          </div>
+          <div>
+            <span>匹配项目</span>
+            <strong>{{ filteredProjects.length }} 个</strong>
+          </div>
+          <div>
+            <span>已选项目</span>
+            <strong>{{ selectedProject?.name ?? '-' }}</strong>
+          </div>
+          <div>
+            <span>权限来源</span>
+            <strong>RBAC 权限码</strong>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div v-if="projectEditorOpen" class="preview-overlay">
+      <section class="project-editor-drawer">
+        <div class="preview-head">
+          <div>
+            <h2>{{ editingProjectId ? '编辑项目' : '新建项目' }}</h2>
+            <span>配置跨部门项目团队的目标与周期。</span>
+          </div>
+          <n-button text @click="projectEditorOpen = false">
+            <template #icon>
+              <n-icon><X /></n-icon>
+            </template>
+          </n-button>
         </div>
 
         <div class="project-form">
@@ -230,7 +319,7 @@
           </label>
         </div>
 
-        <div class="project-editor-actions">
+        <div class="preview-actions">
           <n-button secondary @click="resetForm">重置</n-button>
           <n-button
             type="primary"
@@ -240,7 +329,7 @@
             保存
           </n-button>
         </div>
-      </aside>
+      </section>
     </div>
   </div>
 </template>
@@ -248,7 +337,7 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { NButton, NIcon, NTag, useMessage } from 'naive-ui'
-import { Archive, Pencil, Plus } from 'lucide-vue-next'
+import { Archive, Pencil, Plus, Search, X } from 'lucide-vue-next'
 import { computed, reactive, ref, watchEffect } from 'vue'
 
 import {
@@ -270,11 +359,16 @@ import {
   type ProjectTeam,
   type ProjectTeamMember
 } from '@/api/projectTeams'
+import { Permission, usePermissions } from '@/composables/usePermissions'
 
 const message = useMessage()
 const queryClient = useQueryClient()
+const { hasPermission } = usePermissions()
 const selectedProjectId = ref<string>()
 const editingProjectId = ref<string>()
+const projectEditorOpen = ref(false)
+const keyword = ref('')
+const statusFilter = ref<'all' | ProjectTeam['status']>('all')
 const projectForm = reactive({
   name: '',
   description: '',
@@ -296,6 +390,14 @@ const projectReportForm = reactive<{
   member_visibility: 'private',
   ai_enabled: true
 })
+const statusFilters = [
+  { value: 'all' as const, label: '全部' },
+  { value: 'not_started' as const, label: '未开始' },
+  { value: 'in_progress' as const, label: '进行中' },
+  { value: 'at_risk' as const, label: '有风险' },
+  { value: 'completed' as const, label: '已完成' },
+  { value: 'archived' as const, label: '已归档' }
+]
 
 const { data: projectTeams } = useQuery({
   queryKey: ['project-teams'],
@@ -316,6 +418,26 @@ watchEffect(() => {
 const selectedProject = computed(() =>
   projectTeams.value?.find((project) => project.id === selectedProjectId.value)
 )
+const filteredProjects = computed(() => {
+  const normalizedKeyword = keyword.value.trim().toLowerCase()
+  return (projectTeams.value ?? []).filter((project) => {
+    const matchesStatus =
+      statusFilter.value === 'all' || project.status === statusFilter.value
+    const haystack = [project.name, project.description, project.goal]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return matchesStatus && (!normalizedKeyword || haystack.includes(normalizedKeyword))
+  })
+})
+const statusFilterLabel = computed(
+  () => statusFilters.find((filter) => filter.value === statusFilter.value)?.label ?? '全部'
+)
+const canCreateProject = computed(() => hasPermission(Permission.ProjectCreate))
+const canUpdateProject = computed(() => hasPermission(Permission.ProjectUpdate))
+const canArchiveProject = computed(() => hasPermission(Permission.ProjectArchive))
+const canManageProjectMembers = computed(() => hasPermission(Permission.ProjectMemberManage))
+const canManageProjectRules = computed(() => hasPermission(Permission.ProjectRuleManage))
 
 watchEffect(() => {
   const space = selectedProject.value?.report_space
@@ -353,6 +475,7 @@ const saveProjectMutation = useMutation({
   onSuccess: (project) => {
     selectedProjectId.value = project.id
     editingProjectId.value = project.id
+    projectEditorOpen.value = false
     queryClient.invalidateQueries({ queryKey: ['project-teams'] })
     message.success('项目团队已保存')
   },
@@ -444,6 +567,7 @@ function selectProject(id: string) {
 function startCreate() {
   editingProjectId.value = undefined
   resetForm()
+  projectEditorOpen.value = true
 }
 
 function startEdit(project: ProjectTeam) {
@@ -454,6 +578,7 @@ function startEdit(project: ProjectTeam) {
   projectForm.start_date = project.start_date ?? ''
   projectForm.expected_end_date = project.expected_end_date ?? ''
   projectForm.status = project.status
+  projectEditorOpen.value = true
 }
 
 function resetForm() {
@@ -533,5 +658,14 @@ function reportModeText(mode?: string) {
   if (mode === 'daily') return '日报'
   if (mode === 'daily_weekly') return '日报+周报'
   return '周报'
+}
+
+function projectCountByStatus(status: string) {
+  return (projectTeams.value ?? []).filter((project) => project.status === status).length
+}
+
+function projectMemberRoleText(role: string) {
+  if (role === 'project_admin') return '项目管理员'
+  return '普通成员'
 }
 </script>
